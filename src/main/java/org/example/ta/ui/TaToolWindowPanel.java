@@ -3,6 +3,7 @@ package org.example.ta.ui;
 import com.intellij.openapi.project.Project;
 
 import javax.swing.*;
+import javax.swing.border.Border;
 import java.awt.*;
 
 /**
@@ -18,17 +19,30 @@ public class TaToolWindowPanel {
 
     public TaToolWindowPanel(Project project) {
         panel = new JPanel(new BorderLayout());
-        JPanel top = new JPanel(new BorderLayout());
-        top.add(new JLabel("Question:"), BorderLayout.NORTH);
-        top.add(new JScrollPane(inputArea), BorderLayout.CENTER);
-        JPanel controls = new JPanel();
-        controls.add(askBtn);
-        controls.add(indexBtn);
-        top.add(controls, BorderLayout.SOUTH);
-        panel.add(top, BorderLayout.NORTH);
-
+        
+        // 为输入框添加圆角深色边框
+        Border roundedBorder = BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Color.DARK_GRAY, 1, true), // 圆角边框，深灰色
+            BorderFactory.createEmptyBorder(5, 5, 5, 5) // 内边距
+        );
+        inputArea.setBorder(roundedBorder);
+        
+        // 创建输入面板，包含输入区域和按钮
+        JPanel inputPanel = new JPanel(new BorderLayout());
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // 添加外边距
+        inputPanel.add(new JLabel("Question:"), BorderLayout.NORTH);
+        inputPanel.add(new JScrollPane(inputArea), BorderLayout.CENTER);
+        
+        // 创建按钮面板并放置在输入区域的右下角
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(askBtn);
+        buttonPanel.add(indexBtn);
+        inputPanel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        // 将输出区域放在北部，输入面板放在南部
         outputArea.setEditable(false);
         panel.add(new JScrollPane(outputArea), BorderLayout.CENTER);
+        panel.add(inputPanel, BorderLayout.SOUTH);
 
 // Hook actions (these call into services that should be implemented)
         askBtn.addActionListener(e -> {
