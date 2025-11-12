@@ -42,6 +42,12 @@ public class TaToolWindowPanel {
         // 为输出框添加与输入框一致的边框和间距
         outputArea.setBorder(roundedBorder);
         
+        // 设置文本区域的换行属性
+        inputArea.setLineWrap(true);
+        inputArea.setWrapStyleWord(true);
+        outputArea.setLineWrap(true);
+        outputArea.setWrapStyleWord(true);
+        
         // 创建输入面板，包含输入区域和按钮
         JPanel inputPanel = new JPanel(new BorderLayout());
         inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // 添加外边距
@@ -59,6 +65,9 @@ public class TaToolWindowPanel {
         outputArea.setEditable(false);
         JScrollPane outputScrollPane = new JScrollPane(outputArea);
         outputScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // 为输出区域添加外边距
+        // 设置滚动条策略
+        outputScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        outputScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         panel.add(outputScrollPane, BorderLayout.CENTER);
         panel.add(inputPanel, BorderLayout.SOUTH);
 
