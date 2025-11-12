@@ -1,0 +1,37 @@
+<idea-plugin>
+    <id>org.example.ta-plugin</id>
+    <name>Course TA Assistant</name>
+    <vendor email="you@example.com">Your Team</vendor>
+
+    <description><![CDATA[
+IntelliJ plugin that provides a course-specific RAG Q&A assistant and code-modification features.
+]]></description>
+
+    <!-- 声明依赖 -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <!-- 注册工具窗口 -->
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="CourseTA"
+                    anchor="right"
+                    factoryClass="org.example.ta.ui.TaToolWindowFactory"
+                    icon="AllIcons.General.Information"/>
+    </extensions>
+
+    <!-- 注册两个右键菜单动作 -->
+    <actions>
+        <action id="org.example.ta.AskSelectedCodeAction"
+                class="org.example.ta.actions.AskSelectedCodeAction"
+                text="Ask Course TA (Selected)"
+                description="Ask the course TA about the selected code">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+
+        <action id="org.example.ta.CodeRefactorAction"
+                class="org.example.ta.actions.CodeRefactorAction"
+                text="Refactor with TA"
+                description="Ask TA to refactor the selected method (show diff)">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

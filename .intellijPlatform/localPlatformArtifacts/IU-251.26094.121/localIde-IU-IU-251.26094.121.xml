@@ -1,0 +1,10 @@
+<ivy-module version="2.0">
+  <info organisation="localIde" module="IU" revision="IU-251.26094.121"/>
+  <configurations>
+    <conf name="default" visibility="public"/>
+  </configurations>
+  <publications>
+    <artifact name="aa/IDEAM/IntelliJ IDEA 2025.1.2" ext="directory" conf="default"/>
+  </publications>
+  <dependencies/>
+</ivy-module>
