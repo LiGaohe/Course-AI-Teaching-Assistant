@@ -1,23 +1,30 @@
 <component name="ProjectRunConfigurationManager">
-    <configuration default="false" name="Run IDE with Plugin" type="GradleRunConfiguration" factoryName="Gradle">
-        <log_file alias="idea.log" path="$PROJECT_DIR$/build/idea-sandbox/system/log/idea.log"/>
-        <ExternalSystemSettings>
-            <option name="executionName"/>
-            <option name="externalProjectPath" value="$PROJECT_DIR$"/>
-            <option name="externalSystemIdString" value="GRADLE"/>
-            <option name="scriptParameters" value=""/>
-            <option name="taskDescriptions">
-                <list/>
-            </option>
-            <option name="taskNames">
-                <list>
-                    <option value="runIde"/>
-                </list>
-            </option>
-            <option name="vmOptions" value=""/>
-        </ExternalSystemSettings>
-        <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-        <DebugAllEnabled>false</DebugAllEnabled>
-        <method v="2"/>
-    </configuration>
+  <configuration default="false" name="Run IDE with Plugin" type="GradleRunConfiguration" factoryName="Gradle">
+    <log_file alias="idea.log" path="$PROJECT_DIR$/build/idea-sandbox/system/log/idea.log" />
+    <ExternalSystemSettings>
+      <option name="env">
+        <map>
+          <entry key="OPENROUTER_API_KEY" value="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" />
+        </map>
+      </option>
+      <option name="executionName" />
+      <option name="externalProjectPath" value="$PROJECT_DIR$" />
+      <option name="externalSystemIdString" value="GRADLE" />
+      <option name="scriptParameters" value="" />
+      <option name="taskDescriptions">
+        <list />
+      </option>
+      <option name="taskNames">
+        <list>
+          <option value="runIde" />
+        </list>
+      </option>
+      <option name="vmOptions" value="" />
+    </ExternalSystemSettings>
+    <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+    <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+    <DebugAllEnabled>false</DebugAllEnabled>
+    <RunAsTest>false</RunAsTest>
+    <method v="2" />
+  </configuration>
 </component>

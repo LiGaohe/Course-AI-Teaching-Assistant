@@ -56,6 +56,7 @@ dependencies {
     }
     implementation("org.apache.tika:tika-core:2.9.2")
     implementation("org.apache.tika:tika-parsers-standard-package:2.9.2")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
 }
 
 intellijPlatform {
@@ -83,4 +84,3 @@ kotlin {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }
-
