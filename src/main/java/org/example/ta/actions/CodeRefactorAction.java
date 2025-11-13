@@ -1,5 +1,7 @@
 package org.example.ta.actions;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import com.intellij.diff.DiffContentFactory;
 import com.intellij.diff.DiffManager;
 import com.intellij.diff.contents.DocumentContent;
@@ -14,10 +16,9 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -62,7 +63,7 @@ public class CodeRefactorAction extends AnAction {
             return;
         }
 
-        Messages.showInfoMessage(project, "正在请求 AI 进行代码重构，请稍候……", "AI 正在处理");
+        // Messages.showInfoMessage(project, "正在请求 AI 进行代码重构，请稍候……", "AI 正在处理");
 
         // 异步执行网络请求
         new Thread(() -> {
@@ -78,7 +79,12 @@ public class CodeRefactorAction extends AnAction {
 
             } catch (Exception ex) {
                 ex.printStackTrace();
-                showError(project, "调用 AI 失败：" + ex.getMessage());
+                String errorMsg = ex.getMessage();
+                if (errorMsg.contains("402")) {
+                    showError(project, "调用 AI 失败：API配额已用完或者需要付费。请检查您的账户配额或升级付费计划。");
+                } else {
+                    showError(project, "调用 AI 失败：" + errorMsg);
+                }
             }
         }).start();
     }
@@ -90,11 +96,16 @@ public class CodeRefactorAction extends AnAction {
         String prompt = "请根据以下要求重构这段代码，并仅输出重构后的完整代码：" +
                 "\n要求：" + instruction + "\n代码：\n```java\n" + code + "\n```";
 
+        // 从资源文件中读取模型配置
+        String modelConfigJson = readModelConfig();
+        JSONObject modelConfig = JSON.parseObject(modelConfigJson);
+        String modelName = modelConfig.getString("refactorModel");
+
         JSONObject payload = new JSONObject();
-        payload.put("model", "gpt-4o-mini");  // 也可用 "gpt-4o" 或其他模型
-        JSONArray messages = new JSONArray();
-        messages.put(new JSONObject().put("role", "system").put("content", "你是一名专业的Java重构专家。"));
-        messages.put(new JSONObject().put("role", "user").put("content", prompt));
+        payload.put("model", modelName);
+        com.alibaba.fastjson.JSONArray messages = new com.alibaba.fastjson.JSONArray();
+        messages.add(new JSONObject().fluentPut("role", "system").fluentPut("content", "你是一名专业的Java重构专家。"));
+        messages.add(new JSONObject().fluentPut("role", "user").fluentPut("content", prompt));
         payload.put("messages", messages);
 
         URL url = new URL("https://openrouter.ai/api/v1/chat/completions");
@@ -105,25 +116,59 @@ public class CodeRefactorAction extends AnAction {
         conn.setDoOutput(true);
 
         try (OutputStream os = conn.getOutputStream()) {
-            os.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+            os.write(payload.toJSONString().getBytes(StandardCharsets.UTF_8));
         }
 
+        int responseCode = conn.getResponseCode();
         StringBuilder response = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                response.append(line);
-            }
+        
+        // 根据响应码选择输入流或错误流
+        BufferedReader br;
+        if (responseCode >= 200 && responseCode < 300) {
+            br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
+        } else {
+            br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8));
+        }
+        
+        String line;
+        while ((line = br.readLine()) != null) {
+            response.append(line);
         }
 
-        JSONObject obj = new JSONObject(response.toString());
-        return obj
-                .getJSONArray("choices")
+        // 检查HTTP状态码
+        if (responseCode != 200) {
+            throw new RuntimeException("Server returned HTTP response code: " + responseCode + " for URL: " + url.toString() + ", Response: " + response.toString());
+        }
+
+        JSONObject obj = JSON.parseObject(response.toString());
+        return obj.getJSONArray("choices")
                 .getJSONObject(0)
                 .getJSONObject("message")
                 .getString("content")
                 .trim();
+    }
+
+    /**
+     * 读取模型配置文件
+     * 
+     * @return 配置文件内容
+     * @throws Exception 读取异常
+     */
+    private String readModelConfig() throws Exception {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream("model-config.json")) {
+            if (is == null) {
+                throw new RuntimeException("找不到模型配置文件: model-config.json");
+            }
+            
+            StringBuilder content = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    content.append(line);
+                }
+            }
+            return content.toString();
+        }
     }
 
     /**

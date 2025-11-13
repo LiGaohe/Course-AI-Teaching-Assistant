@@ -1,15 +1,22 @@
 package org.example.ta.llm;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -30,18 +37,47 @@ public class OpenRouterClient {
     private final long retryDelayMs = 1000;
     
     // Model configuration
-    private String model = "alibaba/tongyi-deepresearch-30b-a3b:free";
+    private String model;
 
     public OpenRouterClient(String apiKey) {
         this.apiKey = apiKey;
         this.http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
+        this.model = loadModelConfig();
     }
     
     public OpenRouterClient(String apiKey, String model) {
         this(apiKey);
         this.model = model;
+    }
+    
+    /**
+     * 从配置文件加载模型名称
+     * 
+     * @return 模型名称
+     */
+    private String loadModelConfig() {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream("model-config.json")) {
+            if (is == null) {
+                // 默认模型
+                return "alibaba/tongyi-deepresearch-30b-a3b:free";
+            }
+            
+            StringBuilder content = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    content.append(line);
+                }
+            }
+            
+            JSONObject config = JSON.parseObject(content.toString());
+            return config.getString("questionModel");
+        } catch (Exception e) {
+            // 出现异常时使用默认模型
+            return "alibaba/tongyi-deepresearch-30b-a3b:free";
+        }
     }
 
     /**
@@ -147,6 +183,9 @@ public class OpenRouterClient {
                     long delay = retryDelayMs * (1L << attempt); // Exponential backoff
                     Thread.sleep(delay);
                     continue;
+                } else if (response.statusCode() == 402) {
+                    // Payment required
+                    throw new IOException("API quota exceeded or payment required. Please check your account quota or upgrade your plan.");
                 } else {
                     throw new IOException("OpenRouter API error: " + response.statusCode() + " - " + response.body());
                 }
@@ -195,6 +234,9 @@ public class OpenRouterClient {
                     long delay = retryDelayMs * (1L << attempt); // Exponential backoff
                     Thread.sleep(delay);
                     continue;
+                } else if (response.statusCode() == 402) {
+                    // Payment required
+                    throw new IOException("API quota exceeded or payment required. Please check your account quota or upgrade your plan.");
                 } else {
                     throw new IOException("OpenRouter API error: " + response.statusCode() + " - " + response.body());
                 }
@@ -243,6 +285,9 @@ public class OpenRouterClient {
                     long delay = retryDelayMs * (1L << attempt); // Exponential backoff
                     Thread.sleep(delay);
                     continue;
+                } else if (response.statusCode() == 402) {
+                    // Payment required
+                    throw new IOException("API quota exceeded or payment required. Please check your account quota or upgrade your plan.");
                 } else {
                     throw new IOException("OpenRouter API error: " + response.statusCode() + " - " + response.body());
                 }
