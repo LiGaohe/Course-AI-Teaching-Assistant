@@ -48,7 +48,7 @@ repositories {
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     intellijPlatform {
-        create("IC", "2025.1.4.1")
+        local("E:/intellj idea/IntelliJ IDEA 2025.2.1")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
         // Add necessary plugin dependencies for compilation here, example:
@@ -58,6 +58,8 @@ dependencies {
     implementation("org.apache.tika:tika-parsers-standard-package:2.9.2")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
     implementation("com.alibaba:fastjson:1.2.83")
+    implementation("org.json:json:20231013")
+
 }
 
 intellijPlatform {
