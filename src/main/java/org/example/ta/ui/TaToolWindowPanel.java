@@ -1,10 +1,9 @@
 package org.example.ta.ui;
 
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import org.example.ta.index.DocChunk;
 import org.example.ta.index.DocumentIndexer;
-import org.example.ta.index.VectorStore;
+import org.example.ta.index.IndexFileManager;
 import org.example.ta.llm.OpenRouterClient;
 import org.example.ta.retrieval.SimpleRetriever;
 
@@ -26,10 +25,10 @@ public class TaToolWindowPanel {
     private final JButton askBtn = new JButton("Ask TA");
     private final JButton indexBtn = new JButton("Index Documents");
     private final JButton askWithReasoningBtn = new JButton("Ask with Reasoning");
-    private VectorStore vectorStore; // Store the vector store reference
     private SimpleRetriever retriever; // Store the retriever reference
+    private final IndexFileManager indexFileManager = new IndexFileManager();
 
-    public TaToolWindowPanel(Project project) {
+    public TaToolWindowPanel() {
         panel = new JPanel(new BorderLayout());
         
         // 为输入框添加圆角深色边框
@@ -111,7 +110,11 @@ public class TaToolWindowPanel {
         });
 
         indexBtn.addActionListener(e -> {
-            String path = Messages.showInputDialog(panel, "Enter the path to the documents directory:", "Index Documents", Messages.getQuestionIcon());
+            // Load previously saved paths
+            List<String> savedPaths = indexFileManager.loadDocumentPaths();
+            String defaultPath = savedPaths.isEmpty() ? "" : savedPaths.get(savedPaths.size() - 1);
+            
+            String path = Messages.showInputDialog(panel, "Enter the path to the documents directory:", "Index Documents", Messages.getQuestionIcon(), defaultPath, null);
             if (path == null || path.trim().isEmpty()) {
                 return;
             }
@@ -122,7 +125,11 @@ public class TaToolWindowPanel {
                 return;
             }
             
+            // Save the new path
+            indexFileManager.addDocumentPath(path);
+            
             outputArea.setText("Indexing started...\n");
+            outputArea.append("Index file location: " + indexFileManager.getIndexFilePath() + "\n");
             
             // Perform indexing in background thread to avoid freezing UI
             new Thread(() -> {
@@ -131,7 +138,6 @@ public class TaToolWindowPanel {
                     List<DocChunk> chunks = indexer.indexDirectory(dir);
                     
                     // Create vector store and retriever
-                    vectorStore = indexer.createVectorStore(chunks);
                     retriever = new SimpleRetriever(chunks);
                     
                     // Update UI on EDT
@@ -158,36 +164,7 @@ public class TaToolWindowPanel {
      * @throws Exception If any error occurs during the process
      */
     private String performRAGProcess(String question) throws Exception {
-        // Check if we have indexed documents
-        if (retriever == null) {
-            return "Please index documents first before asking questions.\n" +
-                   "Note: this plugin example requires you to configure document path and OpenRouter API key in code or settings.\n";
-        }
-        
-        // Retrieve relevant chunks
-        List<SimpleRetriever.ScoredChunk> relevantChunks = retriever.retrieve(question, 3);
-        
-        // Extract the text content from the chunks
-        List<String> contextTexts = relevantChunks.stream()
-                .map(result -> String.format("[%s, page %d] %s", 
-                        result.chunk.sourceFile, 
-                        result.chunk.pageNumber, 
-                        result.chunk.text))
-                .collect(Collectors.toList());
-        
-        // Get API key (in a real implementation, this should come from settings)
-        String apiKey = System.getenv("OPENROUTER_API_KEY");
-        if (apiKey == null || apiKey.isEmpty()) {
-            // Fallback to DeepSeek for demonstration
-            //return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
-                   //"Using fallback demonstration mode.\n\n" +
-                   //generateDemonstrationAnswer(question, contextTexts);
-            apiKey = "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";
-        }
-        
-        // Call OpenRouter API
-        OpenRouterClient client = new OpenRouterClient(apiKey, "alibaba/tongyi-deepresearch-30b-a3b:free");
-        return client.generateAnswer(question, contextTexts);
+        return performRAGProcessBase(question, false);
     }
     
     /**
@@ -198,10 +175,22 @@ public class TaToolWindowPanel {
      * @throws Exception If any error occurs during the process
      */
     private String performRAGProcessWithReasoning(String question) throws Exception {
+        return performRAGProcessBase(question, true);
+    }
+    
+    /**
+     * Base method for performing the RAG process
+     *
+     * @param question The user's question
+     * @param withReasoning Whether to include reasoning in the response
+     * @return The generated answer
+     * @throws Exception If any error occurs during the process
+     */
+    private String performRAGProcessBase(String question, boolean withReasoning) throws Exception {
         // Check if we have indexed documents
-        if (retriever == null) {
-            return "Please index documents first before asking questions.\n" +
-                   "Note: this plugin example requires you to configure document path and OpenRouter API key in code or settings.\n";
+        String validationError = validateRetriever();
+        if (validationError != null) {
+            return validationError;
         }
         
         // Retrieve relevant chunks
@@ -219,54 +208,80 @@ public class TaToolWindowPanel {
         String apiKey = System.getenv("OPENROUTER_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
             // Fallback to DeepSeek for demonstration
-            return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
-                   "Using fallback demonstration mode.\n\n" +
-                   generateDemonstrationAnswer(question, contextTexts);
-        }
-        
-        // Build context for the question
-        StringBuilder contextBuilder = new StringBuilder();
-        contextBuilder.append("You are a helpful teaching assistant AI. ");
-        contextBuilder.append("Answer the following question based on the provided course materials. ");
-        contextBuilder.append("Always cite the source material and page number in your answer. ");
-        contextBuilder.append("If the answer is only based on your general knowledge (not from the provided materials), ");
-        contextBuilder.append("explicitly state that at the beginning of your response.\n\n");
-        
-        if (!contextTexts.isEmpty()) {
-            contextBuilder.append("Relevant course materials:\n");
-            for (int i = 0; i < contextTexts.size(); i++) {
-                contextBuilder.append("[Source ").append(i + 1).append("] ")
-                      .append(contextTexts.get(i)).append("\n\n");
+            if (withReasoning) {
+                return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
+                       "Using fallback demonstration mode.\n\n" +
+                       generateDemonstrationAnswer(question, contextTexts);
+            } else {
+                //return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
+                       //"Using fallback demonstration mode.\n\n" +
+                       //generateDemonstrationAnswer(question, contextTexts);
+                apiKey = "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";
             }
         }
         
-        contextBuilder.append("Question: ").append(question).append("\n\n");
-        contextBuilder.append("Answer:");
-        
-        // Call OpenRouter API with reasoning
-        OpenRouterClient client = new OpenRouterClient(apiKey, "alibaba/tongyi-deepresearch-30b-a3b:free");
-        OpenRouterClient.ReasoningResponse response = client.generateAnswerWithReasoning(contextBuilder.toString());
-        
-        // Continue reasoning with follow-up question
-        java.util.List<OpenRouterClient.Message> messages = new java.util.ArrayList<>();
-        messages.add(new OpenRouterClient.Message("user", contextBuilder.toString()));
-        messages.add(new OpenRouterClient.Message("assistant", response.content, response.reasoningDetails));
-        messages.add(new OpenRouterClient.Message("user", "Are you sure? Think carefully."));
-        
-        OpenRouterClient.ReasoningResponse response2 = client.continueReasoning(messages);
-        
-        // Format the output
-        StringBuilder result = new StringBuilder();
-        result.append("First response:\n");
-        result.append(response.content).append("\n\n");
-        result.append("Reasoning details:\n");
-        result.append(response.reasoningDetails).append("\n\n");
-        result.append("Second response (continued reasoning):\n");
-        result.append(response2.content).append("\n\n");
-        result.append("Reasoning details:\n");
-        result.append(response2.reasoningDetails).append("\n");
-        
-        return result.toString();
+        if (withReasoning) {
+            // Build context for the question
+            StringBuilder contextBuilder = new StringBuilder();
+            contextBuilder.append("You are a helpful teaching assistant AI. ");
+            contextBuilder.append("Answer the following question based on the provided course materials. ");
+            contextBuilder.append("Always cite the source material and page number in your answer. ");
+            contextBuilder.append("If the answer is only based on your general knowledge (not from the provided materials), ");
+            contextBuilder.append("explicitly state that at the beginning of your response.\n\n");
+            
+            if (!contextTexts.isEmpty()) {
+                contextBuilder.append("Relevant course materials:\n");
+                for (int i = 0; i < contextTexts.size(); i++) {
+                    contextBuilder.append("[Source ").append(i + 1).append("] ")
+                          .append(contextTexts.get(i)).append("\n\n");
+                }
+            }
+            
+            contextBuilder.append("Question: ").append(question).append("\n\n");
+            contextBuilder.append("Answer:");
+            
+            // Call OpenRouter API with reasoning
+            OpenRouterClient client = new OpenRouterClient(apiKey, "alibaba/tongyi-deepresearch-30b-a3b:free");
+            OpenRouterClient.ReasoningResponse response = client.generateAnswerWithReasoning(contextBuilder.toString());
+            
+            // Continue reasoning with follow-up question
+            java.util.List<OpenRouterClient.Message> messages = new java.util.ArrayList<>();
+            messages.add(new OpenRouterClient.Message("user", contextBuilder.toString()));
+            messages.add(new OpenRouterClient.Message("assistant", response.content, response.reasoningDetails));
+            messages.add(new OpenRouterClient.Message("user", "Are you sure? Think carefully."));
+            
+            OpenRouterClient.ReasoningResponse response2 = client.continueReasoning(messages);
+            
+            // Format the output
+            StringBuilder result = new StringBuilder();
+            result.append("First response:\n");
+            result.append(response.content).append("\n\n");
+            result.append("Reasoning details:\n");
+            result.append(response.reasoningDetails).append("\n\n");
+            result.append("Second response (continued reasoning):\n");
+            result.append(response2.content).append("\n\n");
+            result.append("Reasoning details:\n");
+            result.append(response2.reasoningDetails).append("\n");
+            
+            return result.toString();
+        } else {
+            // Call OpenRouter API
+            OpenRouterClient client = new OpenRouterClient(apiKey, "alibaba/tongyi-deepresearch-30b-a3b:free");
+            return client.generateAnswer(question, contextTexts);
+        }
+    }
+    
+    /**
+     * Validate if documents have been indexed
+     *
+     * @return Error message if validation fails, null otherwise
+     */
+    private String validateRetriever() {
+        if (retriever == null) {
+            return "Please index documents first before asking questions.\n" +
+                   "Note: this plugin example requires you to configure document path and OpenRouter API key in code or settings.\n";
+        }
+        return null;
     }
     
     /**

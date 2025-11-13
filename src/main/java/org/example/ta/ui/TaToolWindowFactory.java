@@ -15,7 +15,7 @@ public class TaToolWindowFactory implements ToolWindowFactory, DumbAware {
 
     @Override
     public void createToolWindowContent(Project project, ToolWindow toolWindow) {
-        TaToolWindowPanel panel = new TaToolWindowPanel(project);
+        TaToolWindowPanel panel = new TaToolWindowPanel();
         ContentFactory contentFactory = ContentFactory.getInstance();
         Content content = contentFactory.createContent(panel.getComponent(), "Course TA", false);
 
