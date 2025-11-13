@@ -27,8 +27,12 @@ public class TaToolWindowPanel {
     private final JButton askWithReasoningBtn = new JButton("Ask with Reasoning");
     private SimpleRetriever retriever; // Store the retriever reference
     private final IndexFileManager indexFileManager = new IndexFileManager();
+    
+    // 添加静态实例引用，以便其他类可以访问
+    private static TaToolWindowPanel instance;
 
     public TaToolWindowPanel() {
+        instance = this;
         panel = new JPanel(new BorderLayout());
         
         // 为输入框添加圆角深色边框
@@ -155,6 +159,21 @@ public class TaToolWindowPanel {
             }).start();
         });
     }
+    
+    // 提供公共方法获取实例
+    public static TaToolWindowPanel getInstance() {
+        return instance;
+    }
+    
+    // 提供公共方法设置输入区域文本
+    public void setInputText(String text) {
+        inputArea.setText(text);
+    }
+    
+    // 提供公共方法触发Ask按钮点击
+    public void ask() {
+        askBtn.doClick();
+    }
 
     /**
      * Perform the full RAG process: retrieve relevant chunks and generate an answer
@@ -199,7 +218,7 @@ public class TaToolWindowPanel {
         // Extract the text content from the chunks
         List<String> contextTexts = relevantChunks.stream()
                 .map(result -> String.format("[%s, page %d] %s", 
-                        result.chunk.sourceFile, 
+                        getFileName(result.chunk.sourceFile), 
                         result.chunk.pageNumber, 
                         result.chunk.text))
                 .collect(Collectors.toList());
@@ -208,15 +227,9 @@ public class TaToolWindowPanel {
         String apiKey = System.getenv("OPENROUTER_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
             // Fallback to DeepSeek for demonstration
-            if (withReasoning) {
-                return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
-                       "Using fallback demonstration mode.\n\n" +
-                       generateDemonstrationAnswer(question, contextTexts);
-            } else {
-                return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
-                       "Using fallback demonstration mode.\n\n" +
-                       generateDemonstrationAnswer(question, contextTexts);
-            }
+            return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
+                   "Using fallback demonstration mode.\n\n" +
+                   generateDemonstrationAnswer(question, contextTexts);
         }
         
         if (withReasoning) {
@@ -314,6 +327,25 @@ public class TaToolWindowPanel {
         }
         
         return sb.toString();
+    }
+
+    /**
+     * Extract file name from full path
+     *
+     * @param fullPath Full path to the file
+     * @return File name with extension
+     */
+    private String getFileName(String fullPath) {
+        if (fullPath == null || fullPath.isEmpty()) {
+            return "Unknown Source";
+        }
+        
+        // Handle both Windows and Unix path separators
+        String[] parts = fullPath.replace('\\', '/').split("/");
+        if (parts.length > 0) {
+            return parts[parts.length - 1];
+        }
+        return fullPath;
     }
 
     public JComponent getComponent() { return panel; }

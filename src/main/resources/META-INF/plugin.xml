@@ -22,7 +22,7 @@ IntelliJ plugin that provides a course-specific RAG Q&A assistant and code-modif
     <actions>
         <action id="org.example.ta.AskSelectedCodeAction"
                 class="org.example.ta.actions.AskSelectedCodeAction"
-                text="Ask Course TA (Selected)"
+                text="Ask Course TA"
                 description="Ask the course TA about the selected code">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>

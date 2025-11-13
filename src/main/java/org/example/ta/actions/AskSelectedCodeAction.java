@@ -6,49 +6,56 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import org.example.ta.index.DocChunk;
-import org.example.ta.index.DocumentIndexer;
-import org.example.ta.index.VectorStore;
-
-import java.util.List;
+import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.psi.PsiFile;
+import org.example.ta.context.CodeContext;
+import org.example.ta.context.ContextAwareProcessor;
+import org.example.ta.ui.TaToolWindowPanel;
 
 public class AskSelectedCodeAction extends AnAction {
     @Override
     public void actionPerformed(AnActionEvent e) {
         Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
-        if (editor == null || project == null) return;
+        PsiFile psiFile = e.getData(CommonDataKeys.PSI_FILE);
+        
+        if (editor == null || project == null || psiFile == null) return;
+        
         String sel = editor.getSelectionModel().getSelectedText();
         if (sel == null || sel.isBlank()) {
             Messages.showInfoMessage(project, "Please select a code fragment first.", "No Selection");
             return;
         }
-        // For demo, show a dialog and the selected code. In a real implementation, call retriever + LLM.
-        String q = Messages.showInputDialog(project, "Ask a question about the selected code:", "Ask TA", Messages.getQuestionIcon());
-        if (q == null || q.isBlank()) return;
-        // Build a prompt including the selected code and ask DeepSeek via DeepSeekClient
-        Messages.showInfoMessage(project, "(Placeholder) Would ask LLM with selected code and display RAG results.", "Ask TA");
-    }
-    
-    /**
-     * Example method showing how to use the indexing and vector store functionality
-     * In a real implementation, this would be integrated with the UI or other components
-     */
-    private void demonstrateIndexingAndSearch() {
-        // This is just a demonstration of how the components work together
-        // In practice, indexing would be done when documents are added/updated
         
-        // 1. Index documents
-        // DocumentIndexer indexer = new DocumentIndexer();
-        // List<DocChunk> chunks = indexer.indexDirectory(new File("path/to/documents"));
+        // Process context awareness
+        ContextAwareProcessor contextProcessor = new ContextAwareProcessor();
+        int selectionStart = editor.getSelectionModel().getSelectionStart();
+        int selectionEnd = editor.getSelectionModel().getSelectionEnd();
+        CodeContext codeContext = contextProcessor.analyzeContext(editor, psiFile, selectionStart, selectionEnd);
         
-        // 2. Create vector store
-        // VectorStore vectorStore = indexer.createVectorStore(chunks);
+        // Use the selected code as the question directly
+        String question = "Please explain the following code:\n\n" + codeContext.getSelectedCode();
         
-        // 3. Search for similar content
-        // double[] queryVector = indexer.createSimpleVector("query text");
-        // List<VectorStore.ScoredChunk> results = vectorStore.search(queryVector, 5);
+        // Get the tool window
+        ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("CourseTA");
+        if (toolWindow == null) {
+            Messages.showErrorDialog(project, "Course TA tool window not found.", "Error");
+            return;
+        }
         
-        // 4. Use results for RAG (Retrieval-Augmented Generation)
+        // Show and activate the tool window
+        toolWindow.show(() -> {
+            // Get the tool window panel instance
+            TaToolWindowPanel panel = TaToolWindowPanel.getInstance();
+            if (panel == null) {
+                Messages.showErrorDialog(project, "Failed to get tool window panel.", "Error");
+                return;
+            }
+            
+            // Set the question in the input area and simulate clicking the ask button
+            panel.setInputText(question);
+            panel.ask();
+        });
     }
 }
