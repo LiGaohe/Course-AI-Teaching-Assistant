@@ -9,8 +9,12 @@ import org.example.ta.retrieval.SimpleRetriever;
 
 import javax.swing.*;
 import javax.swing.border.Border;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -114,50 +118,261 @@ public class TaToolWindowPanel {
         });
 
         indexBtn.addActionListener(e -> {
-            // Load previously saved paths
-            List<String> savedPaths = indexFileManager.loadDocumentPaths();
-            String defaultPath = savedPaths.isEmpty() ? "" : savedPaths.get(savedPaths.size() - 1);
-            
-            String path = Messages.showInputDialog(panel, "Enter the path to the documents directory:", "Index Documents", Messages.getQuestionIcon(), defaultPath, null);
-            if (path == null || path.trim().isEmpty()) {
-                return;
-            }
-            
-            File dir = new File(path);
-            if (!dir.exists() || !dir.isDirectory()) {
-                Messages.showErrorDialog(panel, "Invalid directory path!", "Error");
-                return;
-            }
-            
-            // Save the new path
-            indexFileManager.addDocumentPath(path);
-            
-            outputArea.setText("Indexing started...\n");
-            outputArea.append("Index file location: " + indexFileManager.getIndexFilePath() + "\n");
-            
-            // Perform indexing in background thread to avoid freezing UI
-            new Thread(() -> {
-                try {
-                    DocumentIndexer indexer = new DocumentIndexer();
-                    List<DocChunk> chunks = indexer.indexDirectory(dir);
-                    
-                    // Create vector store and retriever
-                    retriever = new SimpleRetriever(chunks);
-                    
-                    // Update UI on EDT
-                    SwingUtilities.invokeLater(() -> {
-                        outputArea.append("Indexing completed!\n");
-                        outputArea.append("Indexed " + chunks.size() + " chunks.\n");
-                        outputArea.append("Retriever and vector store created and ready for queries.\n");
-                    });
-                } catch (Exception ex) {
-                    SwingUtilities.invokeLater(() -> {
-                        outputArea.append("Indexing failed: " + ex.getMessage() + "\n");
-                        ex.printStackTrace();
-                    });
-                }
-            }).start();
+            showIndexDocumentsDialog();
         });
+    }
+    
+    /**
+     * 显示索引文档对话框，包含知识库管理和添加新路径功能
+     */
+    private void showIndexDocumentsDialog() {
+        // 创建对话框
+        JDialog dialog = new JDialog((Frame) null, "Index Documents", true);
+        dialog.setLayout(new BorderLayout());
+        
+        // 创建主面板
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // 创建知识库显示面板
+        JComponent knowledgeBasePanel = createKnowledgeBasePanel();
+        mainPanel.add(knowledgeBasePanel, BorderLayout.CENTER);
+        
+        // 创建底部按钮面板
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton addBtn = new JButton("Add New Path");
+        JButton deleteBtn = new JButton("Delete Selected");
+        JButton reindexBtn = new JButton("Reindex All");
+        JButton closeBtn = new JButton("Close");
+        
+        // 为删除按钮添加引用，以便在其他地方使用
+        final JButton deleteButtonRef = deleteBtn;
+        
+        addBtn.addActionListener(e -> {
+            addNewDocumentPath(dialog);
+        });
+        
+        deleteBtn.addActionListener(e -> {
+            deleteSelectedPath(dialog, knowledgeBasePanel, deleteButtonRef);
+        });
+        
+        reindexBtn.addActionListener(e -> {
+            reindexAllDocuments(dialog);
+        });
+        
+        closeBtn.addActionListener(e -> {
+            dialog.dispose();
+        });
+        
+        bottomPanel.add(addBtn);
+        bottomPanel.add(deleteBtn);
+        bottomPanel.add(reindexBtn);
+        bottomPanel.add(closeBtn);
+        
+        mainPanel.add(bottomPanel, BorderLayout.SOUTH);
+        
+        dialog.add(mainPanel);
+        dialog.setSize(600, 400);
+        dialog.setLocationRelativeTo(panel);
+        dialog.setVisible(true);
+    }
+    
+    /**
+     * 创建知识库显示面板
+     */
+    private JComponent createKnowledgeBasePanel() {
+        // 使用JTree来显示目录结构
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Knowledge Base");
+        DefaultTreeModel treeModel = new DefaultTreeModel(root);
+        
+        // 加载已有的路径
+        List<String> paths = indexFileManager.loadDocumentPaths();
+        DocumentIndexer indexer = new DocumentIndexer();
+        
+        for (String path : paths) {
+            File dir = new File(path);
+            if (dir.exists() && dir.isDirectory()) {
+                DefaultMutableTreeNode pathNode = new DefaultMutableTreeNode(new FileInfo(dir.getName(), path, true));
+                root.add(pathNode);
+                
+                try {
+                    // 获取目录下的所有文件
+                    List<File> files = indexer.listAllFilesRecursively(dir);
+                    for (File file : files) {
+                        // 获取相对于根目录的路径
+                        String relativePath = dir.toPath().relativize(file.toPath()).toString();
+                        pathNode.add(new DefaultMutableTreeNode(new FileInfo(relativePath, file.getAbsolutePath(), false)));
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                // 路径不存在或不是目录
+                DefaultMutableTreeNode pathNode = new DefaultMutableTreeNode(new FileInfo(dir.getName() + " (Invalid)", path, true));
+                root.add(pathNode);
+            }
+        }
+        
+        JTree tree = new JTree(treeModel);
+        tree.setRootVisible(false);
+        tree.setShowsRootHandles(true);
+        tree.expandPath(new TreePath(root));
+        
+        // 展开所有路径节点
+        for (int i = 0; i < root.getChildCount(); i++) {
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
+            tree.expandPath(new TreePath(child.getPath()));
+        }
+        
+        JScrollPane scrollPane = new JScrollPane(tree);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Knowledge Base"));
+        return scrollPane;
+    }
+    
+    /**
+     * 删除选中的路径
+     */
+    private void deleteSelectedPath(JDialog dialog, JComponent knowledgeBasePanel, JButton deleteButton) {
+        if (knowledgeBasePanel instanceof JScrollPane) {
+            JScrollPane scrollPane = (JScrollPane) knowledgeBasePanel;
+            JViewport viewport = scrollPane.getViewport();
+            if (viewport.getView() instanceof JTree) {
+                JTree tree = (JTree) viewport.getView();
+                DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
+                DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+                
+                TreePath[] selectedPaths = tree.getSelectionPaths();
+                if (selectedPaths != null && selectedPaths.length > 0) {
+                    // 获取选中的节点
+                    DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) selectedPaths[0].getLastPathComponent();
+                    Object userObject = selectedNode.getUserObject();
+                    
+                    if (userObject instanceof FileInfo) {
+                        FileInfo fileInfo = (FileInfo) userObject;
+                        if (fileInfo.isDirectory()) {
+                            String path = fileInfo.getFullPath();
+                            int result = Messages.showYesNoDialog(
+                                dialog, 
+                                "Are you sure you want to delete \"" + path + "\" from the knowledge base?", 
+                                "Confirm Delete", 
+                                Messages.getQuestionIcon()
+                            );
+                            
+                            if (result == Messages.YES) {
+                                // 从索引中删除选定的路径
+                                List<String> currentPaths = indexFileManager.loadDocumentPaths();
+                                currentPaths.remove(path);
+                                indexFileManager.saveDocumentPaths(currentPaths);
+                                
+                                // 更新显示
+                                root.remove(selectedNode);
+                                treeModel.reload();
+                                
+                                outputArea.append("Deleted \"" + path + "\" from knowledge base.\n");
+                            }
+                        } else {
+                            Messages.showInfoMessage(dialog, "Please select a directory path to delete, not a file.", "Delete Path");
+                        }
+                    }
+                } else {
+                    Messages.showInfoMessage(dialog, "Please select a knowledge base path to delete.", "No Selection");
+                }
+            }
+        }
+    }
+    
+    /**
+     * 添加新文档路径
+     */
+    private void addNewDocumentPath(Component parent) {
+        // Load previously saved paths
+        List<String> savedPaths = indexFileManager.loadDocumentPaths();
+        String defaultPath = savedPaths.isEmpty() ? "" : savedPaths.get(savedPaths.size() - 1);
+        
+        String path = Messages.showInputDialog(parent, "Enter the path to the documents directory:", "Index Documents", Messages.getQuestionIcon(), defaultPath, null);
+        if (path == null || path.trim().isEmpty()) {
+            return;
+        }
+        
+        File dir = new File(path);
+        if (!dir.exists() || !dir.isDirectory()) {
+            Messages.showErrorDialog(parent, "Invalid directory path!", "Error");
+            return;
+        }
+        
+        // Save the new path
+        indexFileManager.addDocumentPath(path);
+        
+        outputArea.setText("Indexing started...\n");
+        outputArea.append("Index file location: " + indexFileManager.getIndexFilePath() + "\n");
+        
+        // Perform indexing in background thread to avoid freezing UI
+        new Thread(() -> {
+            try {
+                DocumentIndexer indexer = new DocumentIndexer();
+                List<DocChunk> chunks = indexer.indexDirectory(dir);
+                
+                // Create vector store and retriever
+                retriever = new SimpleRetriever(chunks);
+                
+                // Update UI on EDT
+                SwingUtilities.invokeLater(() -> {
+                    outputArea.append("Indexing completed!\n");
+                    outputArea.append("Indexed " + chunks.size() + " chunks.\n");
+                    outputArea.append("Retriever and vector store created and ready for queries.\n");
+                });
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> {
+                    outputArea.append("Indexing failed: " + ex.getMessage() + "\n");
+                    ex.printStackTrace();
+                });
+            }
+        }).start();
+    }
+    
+    /**
+     * 重新索引所有文档
+     */
+    private void reindexAllDocuments(Component parent) {
+        List<String> paths = indexFileManager.loadDocumentPaths();
+        if (paths.isEmpty()) {
+            Messages.showInfoMessage(parent, "No document paths configured.", "Reindex");
+            return;
+        }
+        
+        outputArea.setText("Reindexing all documents...\n");
+        
+        new Thread(() -> {
+            try {
+                DocumentIndexer indexer = new DocumentIndexer();
+                List<DocChunk> allChunks = new java.util.ArrayList<>();
+                
+                for (String path : paths) {
+                    File dir = new File(path);
+                    if (dir.exists() && dir.isDirectory()) {
+                        SwingUtilities.invokeLater(() -> 
+                            outputArea.append("Indexing: " + path + "\n"));
+                        List<DocChunk> chunks = indexer.indexDirectory(dir);
+                        allChunks.addAll(chunks);
+                    }
+                }
+                
+                // Create vector store and retriever
+                retriever = new SimpleRetriever(allChunks);
+                
+                // Update UI on EDT
+                SwingUtilities.invokeLater(() -> {
+                    outputArea.append("Reindexing completed!\n");
+                    outputArea.append("Total indexed chunks: " + allChunks.size() + "\n");
+                    outputArea.append("Retriever and vector store updated.\n");
+                });
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> {
+                    outputArea.append("Reindexing failed: " + ex.getMessage() + "\n");
+                    ex.printStackTrace();
+                });
+            }
+        }).start();
     }
     
     // 提供公共方法获取实例
@@ -244,8 +459,7 @@ public class TaToolWindowPanel {
             if (!contextTexts.isEmpty()) {
                 contextBuilder.append("Relevant course materials:\n");
                 for (int i = 0; i < contextTexts.size(); i++) {
-                    contextBuilder.append("[Source ").append(i + 1).append("] ")
-                          .append(contextTexts.get(i)).append("\n\n");
+                    contextBuilder.append(contextTexts.get(i)).append("\n\n");
                 }
             }
             
@@ -315,10 +529,7 @@ public class TaToolWindowPanel {
             
             sb.append("Answer (demonstration):\n");
             sb.append("Based on the retrieved course materials, the answer to your question would be generated here.\n");
-            sb.append("In the actual implementation with a valid API key, this would contain a detailed answer citing:\n");
-            for (int i = 0; i < Math.min(3, contextTexts.size()); i++) {
-                sb.append("- [Source ").append(i + 1).append("]\n");
-            }
+            sb.append("In the actual implementation with a valid API key, this would contain a detailed answer citing the sources.\n");
         } else {
             sb.append("No relevant course materials were found.\n");
             sb.append("Answer (demonstration):\n");
@@ -346,6 +557,38 @@ public class TaToolWindowPanel {
             return parts[parts.length - 1];
         }
         return fullPath;
+    }
+    
+    /**
+     * 内部类用于存储文件信息
+     */
+    private static class FileInfo {
+        private final String displayName;
+        private final String fullPath;
+        private final boolean isDirectory;
+        
+        public FileInfo(String displayName, String fullPath, boolean isDirectory) {
+            this.displayName = displayName;
+            this.fullPath = fullPath;
+            this.isDirectory = isDirectory;
+        }
+        
+        public String getDisplayName() {
+            return displayName;
+        }
+        
+        public String getFullPath() {
+            return fullPath;
+        }
+        
+        public boolean isDirectory() {
+            return isDirectory;
+        }
+        
+        @Override
+        public String toString() {
+            return displayName;
+        }
     }
 
     public JComponent getComponent() { return panel; }

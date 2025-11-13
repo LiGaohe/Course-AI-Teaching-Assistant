@@ -104,8 +104,7 @@ public class OpenRouterClient {
         if (!contextChunks.isEmpty()) {
             prompt.append("Relevant course materials:\n");
             for (int i = 0; i < contextChunks.size(); i++) {
-                prompt.append("[Source ").append(i + 1).append("] ")
-                      .append(contextChunks.get(i)).append("\n\n");
+                prompt.append(contextChunks.get(i)).append("\n\n");
             }
         }
         

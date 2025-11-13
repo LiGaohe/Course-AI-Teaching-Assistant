@@ -65,6 +65,37 @@ public class DocumentIndexer {
     }
     
     /**
+     * Get a list of all files in a directory (non-recursive)
+     */
+    public List<File> listFilesInDirectory(File dir) {
+        List<File> files = new ArrayList<>();
+        if (dir.exists() && dir.isDirectory()) {
+            File[] fileArray = dir.listFiles();
+            if (fileArray != null) {
+                for (File file : fileArray) {
+                    if (file.isFile()) {
+                        files.add(file);
+                    }
+                }
+            }
+        }
+        return files;
+    }
+    
+    /**
+     * Recursively get all files in a directory
+     */
+    public List<File> listAllFilesRecursively(File dir) throws IOException {
+        List<File> files = new ArrayList<>();
+        if (dir.exists() && dir.isDirectory()) {
+            Files.walk(dir.toPath())
+                .filter(Files::isRegularFile)
+                .forEach(p -> files.add(p.toFile()));
+        }
+        return files;
+    }
+    
+    /**
      * Convert document chunks to vectors and store them in a VectorStore
      * 
      * @param chunks The document chunks to vectorize
