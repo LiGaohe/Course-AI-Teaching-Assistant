@@ -213,10 +213,9 @@ public class TaToolWindowPanel {
                        "Using fallback demonstration mode.\n\n" +
                        generateDemonstrationAnswer(question, contextTexts);
             } else {
-                //return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
-                       //"Using fallback demonstration mode.\n\n" +
-                       //generateDemonstrationAnswer(question, contextTexts);
-                apiKey = "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";
+                return "To use the full RAG capabilities with OpenRouter, please set the OPENROUTER_API_KEY environment variable.\n" +
+                       "Using fallback demonstration mode.\n\n" +
+                       generateDemonstrationAnswer(question, contextTexts);
             }
         }
         
