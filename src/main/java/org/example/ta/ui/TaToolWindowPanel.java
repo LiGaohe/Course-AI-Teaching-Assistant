@@ -12,6 +12,9 @@ import javax.swing.border.Border;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
+
+import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.JBColor;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -27,8 +30,6 @@ public class TaToolWindowPanel {
     private final JTextArea inputArea = new JTextArea(3, 40);
     private final JTextArea outputArea = new JTextArea(15, 40);
     private final JButton askBtn = new JButton("Ask TA");
-    private final JButton indexBtn = new JButton("Index Documents");
-    private final JButton askWithReasoningBtn = new JButton("Ask with Reasoning");
     private SimpleRetriever retriever; // Store the retriever reference
     private final IndexFileManager indexFileManager = new IndexFileManager();
     
@@ -41,7 +42,7 @@ public class TaToolWindowPanel {
         
         // 为输入框添加圆角深色边框
         Border roundedBorder = BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Color.DARK_GRAY, 1, true), // 圆角边框，深灰色
+            BorderFactory.createLineBorder(JBColor.DARK_GRAY, 1, true), // 圆角边框，深灰色
             BorderFactory.createEmptyBorder(5, 5, 5, 5) // 内边距
         );
         inputArea.setBorder(roundedBorder);
@@ -64,13 +65,15 @@ public class TaToolWindowPanel {
         // 创建按钮面板并放置在输入区域的右下角
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         buttonPanel.add(askBtn);
+        JButton askWithReasoningBtn = new JButton("Ask with Reasoning");
         buttonPanel.add(askWithReasoningBtn);
+        JButton indexBtn = new JButton("Index Documents");
         buttonPanel.add(indexBtn);
         inputPanel.add(buttonPanel, BorderLayout.SOUTH);
         
         // 将输出区域放在北部，输入面板放在南部
         outputArea.setEditable(false);
-        JScrollPane outputScrollPane = new JScrollPane(outputArea);
+        JBScrollPane outputScrollPane = new JBScrollPane(outputArea);
         outputScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // 为输出区域添加外边距
         // 设置滚动条策略
         outputScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
@@ -233,11 +236,9 @@ public class TaToolWindowPanel {
      * 删除选中的路径
      */
     private void deleteSelectedPath(JDialog dialog, JComponent knowledgeBasePanel, JButton deleteButton) {
-        if (knowledgeBasePanel instanceof JScrollPane) {
-            JScrollPane scrollPane = (JScrollPane) knowledgeBasePanel;
+        if (knowledgeBasePanel instanceof JScrollPane scrollPane) {
             JViewport viewport = scrollPane.getViewport();
-            if (viewport.getView() instanceof JTree) {
-                JTree tree = (JTree) viewport.getView();
+            if (viewport.getView() instanceof JTree tree) {
                 DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
                 DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
                 
@@ -247,8 +248,7 @@ public class TaToolWindowPanel {
                     DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode) selectedPaths[0].getLastPathComponent();
                     Object userObject = selectedNode.getUserObject();
                     
-                    if (userObject instanceof FileInfo) {
-                        FileInfo fileInfo = (FileInfo) userObject;
+                    if (userObject instanceof FileInfo fileInfo) {
                         if (fileInfo.isDirectory()) {
                             String path = fileInfo.getFullPath();
                             int result = Messages.showYesNoDialog(
@@ -287,7 +287,7 @@ public class TaToolWindowPanel {
     private void addNewDocumentPath(Component parent) {
         // Load previously saved paths
         List<String> savedPaths = indexFileManager.loadDocumentPaths();
-        String defaultPath = savedPaths.isEmpty() ? "" : savedPaths.get(savedPaths.size() - 1);
+        String defaultPath = savedPaths.isEmpty() ? "" : savedPaths.getLast();
         
         String path = Messages.showInputDialog(parent, "Enter the path to the documents directory:", "Index Documents", Messages.getQuestionIcon(), defaultPath, null);
         if (path == null || path.trim().isEmpty()) {
@@ -458,8 +458,8 @@ public class TaToolWindowPanel {
             
             if (!contextTexts.isEmpty()) {
                 contextBuilder.append("Relevant course materials:\n");
-                for (int i = 0; i < contextTexts.size(); i++) {
-                    contextBuilder.append(contextTexts.get(i)).append("\n\n");
+                for (String contextText : contextTexts) {
+                    contextBuilder.append(contextText).append("\n\n");
                 }
             }
             
@@ -571,10 +571,6 @@ public class TaToolWindowPanel {
             this.displayName = displayName;
             this.fullPath = fullPath;
             this.isDirectory = isDirectory;
-        }
-        
-        public String getDisplayName() {
-            return displayName;
         }
         
         public String getFullPath() {
