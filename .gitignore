@@ -45,3 +45,8 @@ bin/
 .run/Run IDE with Plugin.run.xml
 /assets
 /docs
+接口设计.md
+系统架构.md
+.run/Run IDE with Plugin.run.xml
+.intellijPlatform/self-update.lock
+.run/Run IDE with Plugin.run.xml
