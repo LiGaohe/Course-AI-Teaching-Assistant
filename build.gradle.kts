@@ -59,6 +59,8 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
     implementation("com.alibaba:fastjson:1.2.83")
     implementation("org.json:json:20231013")
+    implementation("com.formdev:flatlaf:3.4")
+    implementation("com.formdev:flatlaf-extras:3.4")
 
 }
 

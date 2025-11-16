@@ -3,6 +3,8 @@
     <name>Course TA Assistant</name>
     <vendor email="you@example.com">Your Team</vendor>
 
+    <icon>/META-INF/pluginIcon.svg</icon>
+
     <description><![CDATA[
 IntelliJ plugin that provides a course-specific RAG Q&A assistant and code-modification features.
 ]]></description>
@@ -15,7 +17,7 @@ IntelliJ plugin that provides a course-specific RAG Q&A assistant and code-modif
         <toolWindow id="CourseTA"
                     anchor="right"
                     factoryClass="org.example.ta.ui.TaToolWindowFactory"
-                    icon="AllIcons.General.Information"/>
+                    icon="/META-INF/pluginIcon.svg"/>
     </extensions>
 
     <!-- 注册两个右键菜单动作 -->

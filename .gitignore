@@ -43,3 +43,5 @@ bin/
 .idea/vcs.xml
 .intellijPlatform/localPlatformArtifacts/IC-251.27812.49/bundledPlugin-com.intellij.java-IC-251.27812.49.xml
 .run/Run IDE with Plugin.run.xml
+/assets
+/docs
